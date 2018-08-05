@@ -19,6 +19,7 @@ const ONE_TRIGGERED = '1'
 const ONE_TWO_TRIGGERED = '12'
 const TWO_TRIGGERED = '2'
 const TWO_ONE_TRIGGERED = '21'
+const OPENING = 'opening'
 
 let state = NONE 
 let pulseWidth = upPulseWidth
@@ -30,6 +31,7 @@ const openGates = () => {
   clearInterval(timer)
   timer = setInterval(() => {
     if (pulseWidth <= upPulseWidth) {
+      state = NONE
       clearInterval(timer)
     } else {
       pulseWidth -= increment
@@ -55,7 +57,7 @@ sensor1.on('interrupt', (level) => {
   if (!level && (state == TWO_TRIGGERED)) {
     state = TWO_ONE_TRIGGERED
   } else if (level && (state == TWO_ONE_TRIGGERED)) {
-    state = NONE
+    state = OPENING
     openGates()
   } else if (!level && (state == NONE)) {
     state = ONE_TRIGGERED
@@ -69,7 +71,7 @@ sensor2.on('interrupt', (level) => {
   if (!level && (state == ONE_TRIGGERED)) {
     state = ONE_TWO_TRIGGERED
   } else if (level && (state == ONE_TWO_TRIGGERED)) {
-    state = NONE
+    state = OPENING
     openGates()
   } else if (!level && (state == NONE)) {
     state = TWO_TRIGGERED
