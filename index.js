@@ -35,14 +35,31 @@ const TWO_TRIGGERED = '2'
 const TWO_ONE_TRIGGERED = '21'
 const EXTERNAL_TRIGGER = 'ext'
 
+const update = s => {
+  clientTokenUpdate = thingShadows.update('FatController', createReportedState(s))
+  if (clientTokenUpdate === null) {
+    console.log('update shadow failed, operation still in progress')
+  }
+}
+
 const setGateState = s => {
   console.log(`${gateState} => ${s}`)
   gateState = s
+  update({gateState: gateState})
 }
 
 const setSensorState = s => {
   console.log(`${sensorState} => ${s}`)
   sensorState = s
+  update({sensorState: sensorState})
+}
+
+const createReportedState = s => {
+  return {
+    "state": {
+      "reported": s
+    }
+  }
 }
 
 let gateState = OPEN 
@@ -81,10 +98,10 @@ const closeGates = () => {
 }
 
 sensor1.on('interrupt', (level) => {
-  console.log(`1 = ${level}: ${sensorState}`)
   if (!level && (sensorState == TWO_TRIGGERED)) {
     setSensorState(TWO_ONE_TRIGGERED)
   } else if (level && (sensorState == TWO_ONE_TRIGGERED)) {
+    setSensorState(NONE)
     openGates()
   } else if (!level && (sensorState == NONE)) {
     setSensorState(ONE_TRIGGERED)
@@ -93,10 +110,10 @@ sensor1.on('interrupt', (level) => {
 })
 
 sensor2.on('interrupt', (level) => {
-  console.log(`2 = ${level}: ${sensorState}`)
   if (!level && (sensorState == ONE_TRIGGERED)) {
     setSensorState(ONE_TWO_TRIGGERED)
   } else if (level && (sensorState == ONE_TWO_TRIGGERED)) {
+    setSensorState(NONE)
     openGates()
   } else if (!level && (sensorState == NONE)) {
     setSensorState(TWO_TRIGGERED)
@@ -107,14 +124,8 @@ sensor2.on('interrupt', (level) => {
 thingShadows.on('connect', () => {
   thingShadows.subscribe('override');
   thingShadows.register( 'FatController', {}, () => {
-    let shadowState = {
-      "state": {
-        "reported": {
-          "gates": "open"
-        }
-      }
-    }
-    thingShadows.update('FatController', shadowState)
+    const initialState = createReportedState({gateState: gateState, sensorState: sensorState})
+    thingShadows.update('FatController', initialState)
   })
 })
 
