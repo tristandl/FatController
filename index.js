@@ -128,6 +128,7 @@ const closeGates = () => {
 
 /* --- INPUTS --- */
 sensor1.on('alert', (level) => {
+  update({sensor1: level ? 'off' : 'on'})
   if (!level && (sensorState == TWO_TRIGGERED)) {
     setSensorState(TWO_ONE_TRIGGERED)
   } else if (level && (sensorState == TWO_ONE_TRIGGERED)) {
@@ -140,6 +141,7 @@ sensor1.on('alert', (level) => {
 })
 
 sensor2.on('alert', (level) => {
+  update({sensor2: level ? 'off' : 'on'})
   if (!level && (sensorState == ONE_TRIGGERED)) {
     setSensorState(ONE_TWO_TRIGGERED)
   } else if (level && (sensorState == ONE_TWO_TRIGGERED)) {
