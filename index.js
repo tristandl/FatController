@@ -1,13 +1,17 @@
 /* --- GPIO SETUP --- */
-const Gpio = require('pigpio').Gpio;
+const Gpio = require('pigpio').Gpio
 
-const createInput = (pin) => new Gpio(pin, {
-  mode: Gpio.INPUT,
-  pullUpDown: Gpio.PUD_DOWN,
-  edge: Gpio.EITHER_EDGE
-});
+const createInput = (pin) => {
+  const input = new Gpio(pin, {
+    mode: Gpio.INPUT,
+    pullUpDown: Gpio.PUD_DOWN,
+    alert: true
+  })
+  input.glitchFilter(25000) // microseconds
+  return input
+}
 
-const motor = new Gpio(18, {mode: Gpio.OUTPUT});
+const motor = new Gpio(18, {mode: Gpio.OUTPUT})
 const sensor1 = createInput(4)
 const sensor2 = createInput(17)
 const upPulseWidth = 1000
@@ -18,7 +22,7 @@ const interval = 20
 motor.servoWrite(upPulseWidth)
 
 /* --- AWS IoT SETUP --- */
-const awsIot = require('aws-iot-device-sdk');
+const awsIot = require('aws-iot-device-sdk')
 
 let thingShadows = awsIot.thingShadow({
      keyPath: 'certs/f119548414-private.pem.key',
@@ -26,7 +30,7 @@ let thingShadows = awsIot.thingShadow({
       caPath: 'certs/VeriSign-Class 3-Public-Primary-Certification-Authority-G5.pem',
     clientId: 'Fatcontroller-01',
         host: 'a1lae8l0b2awl8.iot.us-west-2.amazonaws.com'
-});
+})
  
 /* --- CONSTANTS --- */
 const OPEN = 'open'
@@ -103,7 +107,7 @@ const openGates = () => {
       clearInterval(timer)
     } else {
       pulseWidth -= increment
-      motor.servoWrite(pulseWidth);
+      motor.servoWrite(pulseWidth)
     }
   }, interval)
 }
@@ -117,13 +121,13 @@ const closeGates = () => {
       clearInterval(timer)
     } else {
       pulseWidth += increment
-      motor.servoWrite(pulseWidth);
+      motor.servoWrite(pulseWidth)
     }
   }, interval)
 }
 
 /* --- INPUTS --- */
-sensor1.on('interrupt', (level) => {
+sensor1.on('alert', (level) => {
   if (!level && (sensorState == TWO_TRIGGERED)) {
     setSensorState(TWO_ONE_TRIGGERED)
   } else if (level && (sensorState == TWO_ONE_TRIGGERED)) {
@@ -135,7 +139,7 @@ sensor1.on('interrupt', (level) => {
   }
 })
 
-sensor2.on('interrupt', (level) => {
+sensor2.on('alert', (level) => {
   if (!level && (sensorState == ONE_TRIGGERED)) {
     setSensorState(ONE_TWO_TRIGGERED)
   } else if (level && (sensorState == ONE_TWO_TRIGGERED)) {
@@ -149,7 +153,7 @@ sensor2.on('interrupt', (level) => {
 
 /* --- AWS Pub/Sub --- */
 thingShadows.on('connect', () => {
-  thingShadows.subscribe('override');
+  thingShadows.subscribe('override')
   thingShadows.register( 'FatController', {}, () => {
     const initialState = createReportedState({gateState: gateState, sensorState: sensorState})
     thingShadows.update('FatController', initialState)
@@ -167,7 +171,7 @@ thingShadows.on('status', (thingName, stat, clientToken, stateObject) => {
 })
 
 thingShadows.on('message', (topic, jsonPayload) => {
-  let payload = JSON.parse(jsonPayload.toString());
+  let payload = JSON.parse(jsonPayload.toString())
 
   console.log(`Received message on topic: ${topic}\n${JSON.stringify(payload)}`)
   if (topic == 'override') {
