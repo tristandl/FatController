@@ -1,7 +1,7 @@
 const Gpio = require('pigpio').Gpio;
 const awsIot = require('aws-iot-device-sdk');
 
-var thingShadows = awsIot.thingShadow({
+var thingShadow = awsIot.thingShadow({
      keyPath: 'certs/f119548414-private.pem.key',
     certPath: 'certs/f119548414-certificate.pem.crt',
       caPath: 'certs/VeriSign-Class 3-Public-Primary-Certification-Authority-G5.pem',
@@ -29,6 +29,7 @@ const ONE_TWO_TRIGGERED = '12'
 const TWO_TRIGGERED = '2'
 const TWO_ONE_TRIGGERED = '21'
 const OPENING = 'opening'
+const EXTERNAL_TRIGGER = 'ext'
 
 let state = NONE 
 let pulseWidth = upPulseWidth
@@ -87,4 +88,23 @@ sensor2.on('interrupt', (level) => {
     closeGates()
   }
   console.log(`... ${level}: ${state}`)
+})
+
+thingShadow.on('connect', () => {
+  thingShadow.subscribe('override');
+})
+
+thingShadow.on('message', (topic, payload) => {
+  var payload = JSON.parse(payload.toString());
+
+  console.log(`Received message on ${topic}: ${payload}`)
+  if (topic == 'override') {
+    if (payload.command == 'open') {
+      state = OPENING
+      openGates()
+    } else if (payload.command == 'close') {
+      state = EXTERNAL_TRIGGER
+      closeGates()
+    }
+  }
 })
