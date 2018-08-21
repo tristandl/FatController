@@ -1,4 +1,13 @@
 const Gpio = require('pigpio').Gpio;
+const awsIot = require('aws-iot-device-sdk');
+
+var thingShadows = awsIot.thingShadow({
+     keyPath: 'certs/f119548414-private.pem.key',
+    certPath: 'certs/f119548414-certificate.pem.crt',
+      caPath: 'certs/VeriSign-Class 3-Public-Primary-Certification-Authority-G5.pem',
+    clientId: 'Fatcontroller-01',
+        host: 'a1lae8l0b2awl8.iot.us-west-2.amazonaws.com'
+});
  
 const createInput = (pin) => new Gpio(pin, {
   mode: Gpio.INPUT,
