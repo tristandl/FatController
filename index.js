@@ -28,7 +28,7 @@ let thingShadows = awsIot.thingShadow({
      keyPath: 'certs/f119548414-private.pem.key',
     certPath: 'certs/f119548414-certificate.pem.crt',
       caPath: 'certs/VeriSign-Class 3-Public-Primary-Certification-Authority-G5.pem',
-    clientId: 'Fatcontroller-01',
+    clientId: 'Fatcontroller',
         host: 'a1lae8l0b2awl8.iot.us-west-2.amazonaws.com'
 })
  
@@ -48,25 +48,34 @@ const EXTERNAL_TRIGGER = 'ext'
 /* --- MESSAGE QUEUEING & THING UPDATES --- */
 let inflightOperations = new Set()
 let messageQueue = []
+let clientTokenUpdate
+
 const update = s => {
   console.log('New update...')
   if (inflightOperations.size == 0) {
-    sendUpdate(s)
+    sendUpdate(createReportedState(s))
   } else {
-    messageQueue.push(s)
-    console.log('...enqueing message:')
-    console.log(messageQueue)
+    console.log(`...enqueing message. ${messageQueue.length} exist already`)
+    messageQueue.push(createReportedState(s))
   }
 }
 
 const sendUpdate = s => {
   console.log('...sending update:')
   console.log(s)
-  clientTokenUpdate = thingShadows.update('FatController', createReportedState(s))
+  clientTokenUpdate = thingShadows.update('FatController', s)
   if (clientTokenUpdate === null) {
     console.log('update shadow failed, operation still in progress')
   } else {
     inflightOperations.add(clientTokenUpdate)
+  }
+}
+
+const createDesiredState = s => {
+  return {
+    "state": {
+      "desired": s
+    }
   }
 }
 
@@ -80,15 +89,17 @@ const createReportedState = s => {
 
 /* --- ACTIONS --- */
 const setGateState = s => {
+  if (gateState === s) return
   console.log(`${gateState} => ${s}`)
   gateState = s
-  update({gateState: gateState})
+  update({gateState})
 }
 
 const setSensorState = s => {
+  if (sensorState === s) return
   console.log(`${sensorState} => ${s}`)
   sensorState = s
-  update({sensorState: sensorState})
+  update({sensorState})
 }
 
 /* --- STATE --- */
@@ -100,12 +111,12 @@ let timer
 /* --- TASKS --- */
 const openGates = () => {
   clearInterval(timer)
-  setGateState(OPENING)
   timer = setInterval(() => {
     if (pulseWidth <= upPulseWidth) {
       setGateState(OPEN)
       clearInterval(timer)
     } else {
+      setGateState(OPENING)
       pulseWidth -= increment
       motor.servoWrite(pulseWidth)
     }
@@ -114,12 +125,12 @@ const openGates = () => {
  
 const closeGates = () => {
   clearInterval(timer)
-  setGateState(CLOSING)
   timer = setInterval(() => {
     if (pulseWidth >= downPulseWidth) {
       setGateState(CLOSED)
       clearInterval(timer)
     } else {
+      setGateState(CLOSING)
       pulseWidth += increment
       motor.servoWrite(pulseWidth)
     }
@@ -156,7 +167,7 @@ sensor2.on('alert', (level) => {
 /* --- AWS Pub/Sub --- */
 thingShadows.on('connect', () => {
   thingShadows.subscribe('override')
-  thingShadows.register( 'FatController', {}, () => {
+  thingShadows.register('FatController', {}, () => {
     const initialState = createReportedState({gateState: gateState, sensorState: sensorState})
     thingShadows.update('FatController', initialState)
   })
@@ -164,10 +175,9 @@ thingShadows.on('connect', () => {
 
 thingShadows.on('status', (thingName, stat, clientToken, stateObject) => {
   inflightOperations.delete(clientToken)
+  console.log(`Message sent successfully. ${messageQueue.length} left to send`)
   if (messageQueue.length > 0) {
     const nextUpdate = messageQueue.shift()
-    console.log('...dequeueing message:')
-    console.log(messageQueue)
     sendUpdate(nextUpdate)
   }
 })
@@ -186,6 +196,12 @@ thingShadows.on('message', (topic, jsonPayload) => {
   }
 })
 
-let clientTokenUpdate
-
-
+thingShadows.on('delta', (thingName, stateObject) => {
+  newGateState = stateObject && stateObject.state && stateObject.state.gateState
+  console.log(`New desired state: ${newGateState}`)
+  sendUpdate(createDesiredState({gateState: null}))
+  switch (newGateState) {
+    case 'open': openGates(); break
+    case 'closed': closeGates(); break
+  }
+})
