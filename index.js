@@ -1,14 +1,6 @@
+/* --- GPIO SETUP --- */
 const Gpio = require('pigpio').Gpio;
-const awsIot = require('aws-iot-device-sdk');
 
-let thingShadows = awsIot.thingShadow({
-     keyPath: 'certs/f119548414-private.pem.key',
-    certPath: 'certs/f119548414-certificate.pem.crt',
-      caPath: 'certs/VeriSign-Class 3-Public-Primary-Certification-Authority-G5.pem',
-    clientId: 'Fatcontroller-01',
-        host: 'a1lae8l0b2awl8.iot.us-west-2.amazonaws.com'
-});
- 
 const createInput = (pin) => new Gpio(pin, {
   mode: Gpio.INPUT,
   pullUpDown: Gpio.PUD_DOWN,
@@ -23,6 +15,20 @@ const downPulseWidth = 2000
 const increment = 5 
 const interval = 20
 
+motor.servoWrite(upPulseWidth)
+
+/* --- AWS IoT SETUP --- */
+const awsIot = require('aws-iot-device-sdk');
+
+let thingShadows = awsIot.thingShadow({
+     keyPath: 'certs/f119548414-private.pem.key',
+    certPath: 'certs/f119548414-certificate.pem.crt',
+      caPath: 'certs/VeriSign-Class 3-Public-Primary-Certification-Authority-G5.pem',
+    clientId: 'Fatcontroller-01',
+        host: 'a1lae8l0b2awl8.iot.us-west-2.amazonaws.com'
+});
+ 
+/* --- CONSTANTS --- */
 const OPEN = 'open'
 const OPENING = 'opening'
 const CLOSED = 'closed'
@@ -35,6 +41,7 @@ const TWO_TRIGGERED = '2'
 const TWO_ONE_TRIGGERED = '21'
 const EXTERNAL_TRIGGER = 'ext'
 
+/* --- MESSAGE QUEUEING & THING UPDATES --- */
 let inflightOperations = new Set()
 let messageQueue = []
 const update = s => {
@@ -59,6 +66,15 @@ const sendUpdate = s => {
   }
 }
 
+const createReportedState = s => {
+  return {
+    "state": {
+      "reported": s
+    }
+  }
+}
+
+/* --- ACTIONS --- */
 const setGateState = s => {
   console.log(`${gateState} => ${s}`)
   gateState = s
@@ -71,21 +87,13 @@ const setSensorState = s => {
   update({sensorState: sensorState})
 }
 
-const createReportedState = s => {
-  return {
-    "state": {
-      "reported": s
-    }
-  }
-}
-
+/* --- STATE --- */
 let gateState = OPEN 
 let sensorState = NONE
 let pulseWidth = upPulseWidth
 let timer
 
-motor.servoWrite(upPulseWidth)
-
+/* --- TASKS --- */
 const openGates = () => {
   clearInterval(timer)
   setGateState(OPENING)
@@ -114,6 +122,7 @@ const closeGates = () => {
   }, interval)
 }
 
+/* --- INPUTS --- */
 sensor1.on('interrupt', (level) => {
   if (!level && (sensorState == TWO_TRIGGERED)) {
     setSensorState(TWO_ONE_TRIGGERED)
@@ -138,6 +147,7 @@ sensor2.on('interrupt', (level) => {
   }
 })
 
+/* --- AWS Pub/Sub --- */
 thingShadows.on('connect', () => {
   thingShadows.subscribe('override');
   thingShadows.register( 'FatController', {}, () => {
