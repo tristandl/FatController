@@ -1,7 +1,7 @@
 const Gpio = require('pigpio').Gpio;
 const awsIot = require('aws-iot-device-sdk');
 
-var thingShadow = awsIot.thingShadow({
+var thingShadows = awsIot.thingShadow({
      keyPath: 'certs/f119548414-private.pem.key',
     certPath: 'certs/f119548414-certificate.pem.crt',
       caPath: 'certs/VeriSign-Class 3-Public-Primary-Certification-Authority-G5.pem',
@@ -90,14 +90,24 @@ sensor2.on('interrupt', (level) => {
   console.log(`... ${level}: ${state}`)
 })
 
-thingShadow.on('connect', () => {
-  thingShadow.subscribe('override');
+thingShadows.on('connect', () => {
+  thingShadows.subscribe('override');
+  thingShadows.register( 'FatController', {}, () => {
+    let shadowState = {
+      "state": {
+        "reported": {
+          "gates": "open"
+        }
+      }
+    }
+    thingShadows.update('FatController', shadowState)
+  })
 })
 
-thingShadow.on('message', (topic, payload) => {
+thingShadows.on('message', (topic, payload) => {
   var payload = JSON.parse(payload.toString());
 
-  console.log(`Received message on ${topic}: ${payload}`)
+  console.log(`Received message on topic: ${topic}\n${JSON.stringify(payload)}`)
   if (topic == 'override') {
     if (payload.command == 'open') {
       state = OPENING
@@ -108,3 +118,7 @@ thingShadow.on('message', (topic, payload) => {
     }
   }
 })
+
+var clientTokenUpdate
+
+
