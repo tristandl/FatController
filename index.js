@@ -35,10 +35,27 @@ const TWO_TRIGGERED = '2'
 const TWO_ONE_TRIGGERED = '21'
 const EXTERNAL_TRIGGER = 'ext'
 
+let inflightOperations = new Set()
+let messageQueue = []
 const update = s => {
+  console.log('New update...')
+  if (inflightOperations.size == 0) {
+    sendUpdate(s)
+  } else {
+    messageQueue.push(s)
+    console.log('...enqueing message:')
+    console.log(messageQueue)
+  }
+}
+
+const sendUpdate = s => {
+  console.log('...sending update:')
+  console.log(s)
   clientTokenUpdate = thingShadows.update('FatController', createReportedState(s))
   if (clientTokenUpdate === null) {
     console.log('update shadow failed, operation still in progress')
+  } else {
+    inflightOperations.add(clientTokenUpdate)
   }
 }
 
@@ -127,6 +144,16 @@ thingShadows.on('connect', () => {
     const initialState = createReportedState({gateState: gateState, sensorState: sensorState})
     thingShadows.update('FatController', initialState)
   })
+})
+
+thingShadows.on('status', (thingName, stat, clientToken, stateObject) => {
+  inflightOperations.delete(clientToken)
+  if (messageQueue.length > 0) {
+    const nextUpdate = messageQueue.shift()
+    console.log('...dequeueing message:')
+    console.log(messageQueue)
+    sendUpdate(nextUpdate)
+  }
 })
 
 thingShadows.on('message', (topic, jsonPayload) => {
